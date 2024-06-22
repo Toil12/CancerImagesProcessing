@@ -191,19 +191,21 @@ def dice_loss(inputs, target):
     loss = 1 - ((2. * intersection + smooth) / (iflat.sum() + tflat.sum() + smooth))
     return loss
 
-def store_train_results(loss_array:numpy.array,model:nn.Module):
-    file_names=os.listdir(TRAIN_PATH)
-    store_path=""
-    if file_names==[]:
-        store_path=osp.join(TRAIN_PATH,f"train_{0}")
-    else:
-        store_path=osp.join(TRAIN_PATH,f"train_{len(file_names)-1}")
-    os.mkdir(store_path)
-
+def store_train_results(loss_array:numpy.array,model:nn.Module,store_path):
     torch.save(model.state_dict(),osp.join(store_path,"model.pt"))
     loss_array=np.array(loss_array)
     np.save(osp.join(store_path,"loss.npy"),loss_array)
+    return store_path
 
+def get_store_path():
+    file_names = os.listdir(TRAIN_PATH)
+    store_path = ""
+    if file_names == []:
+        store_path = osp.join(TRAIN_PATH, f"train_{0}")
+    else:
+        store_path = osp.join(TRAIN_PATH, f"train_{len(file_names) - 1}")
+    os.mkdir(store_path)
+    return store_path
 
 def train_s():
     # set device
@@ -270,6 +272,9 @@ if __name__ == '__main__':
     optimizer = torch.optim.SGD(model.parameters(), lr=0.02, momentum=0.5)
     loss_all=[]
 
+    # set store path
+    store_path=get_store_path()
+
     for epoch in tqdm(range(100)):
         loss_epoch = []
         for images, labels in iter(train_loader):
@@ -297,7 +302,7 @@ if __name__ == '__main__':
         loss_all.append(np.mean(loss_epoch))
         print(f"Epoch {epoch} | Training loss:{np.mean(loss_epoch)}")
 
-    store_train_results(loss_all,model)
+    store_train_results(loss_all,model,store_path)
 
     # process output by a threshold
     output = torch.sigmoid(output)
@@ -307,10 +312,13 @@ if __name__ == '__main__':
     batch_index = 0
     print("image")
     plt.imshow(images.cpu().detach().numpy()[batch_index, 0])
+    plt.savefig(osp.join(store_path,"original.jpg"))
     plt.show()
     print("output")
     plt.imshow(output.cpu().detach().numpy()[batch_index, 0])
+    plt.savefig(osp.join(store_path, "output.jpg"))
     plt.show()
     print("label")
     plt.imshow(labels.cpu().detach().numpy()[batch_index, 0])
+    plt.savefig(osp.join(store_path, "label.jpg"))
     plt.show()
