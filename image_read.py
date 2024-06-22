@@ -261,14 +261,16 @@ if __name__ == '__main__':
     # set device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = UNet(n_channels=3, n_classes=1)
+    model = nn.DataParallel(model)
     model.to(device)
 
     # loss and optimizer
     criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=0.02, momentum=0.5)
-    loss_all=[]
+
 
     for epoch in tqdm(range(100)):
+        loss_all = []
         for images, labels in iter(train_loader):
             images = images.to(device)
             labels = labels.to(device)
@@ -284,16 +286,16 @@ if __name__ == '__main__':
             # output[output >= 0.5] = 1
             # output[output < 0.5] = 0
 
-            loss_train = criterion(output, labels)
-            loss_all=loss_all.append(loss_train)
+            loss = criterion(output, labels)
+            loss_all.append(loss.item())
+
             optimizer.zero_grad()
-            loss_train.backward()
+            loss.backward()
             optimizer.step()
 
+        print(f"Epoch {epoch} | Training loss:{loss}")
 
-
-        print(f"Epoch {epoch} training loss:{loss_train}")
-    store_train_results(loss_train,model)
+    store_train_results(loss_all,model)
 
     # process output by a threshold
     output = torch.sigmoid(output)
