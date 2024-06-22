@@ -200,8 +200,9 @@ def store_train_results(loss_array:numpy.array,model:nn.Module):
         store_path=osp.join(TRAIN_PATH,f"train_{len(file_names)-1}")
     os.mkdir(store_path)
 
-    torch.save(model.state_dict(),store_path)
-    np.save(loss_array,store_path)
+    torch.save(model.state_dict(),osp.join(store_path,"model.pt"))
+    loss_array=np.array(loss_array)
+    np.save(osp.join(store_path,"loss.npy"),loss_array)
 
 
 def train_s():
@@ -267,10 +268,10 @@ if __name__ == '__main__':
     # loss and optimizer
     criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=0.02, momentum=0.5)
-
+    loss_all=[]
 
     for epoch in tqdm(range(10)):
-        loss_all = []
+        loss_epoch = []
         for images, labels in iter(train_loader):
             images = images.to(device)
             labels = labels.to(device)
@@ -287,13 +288,14 @@ if __name__ == '__main__':
             # output[output < 0.5] = 0
 
             loss = criterion(output, labels)
-            loss_all.append(loss.item())
+            loss_epoch.append(loss.item())
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-        print(f"Epoch {epoch} | Training loss:{loss}")
+        loss_all.append(np.mean(loss_epoch))
+        print(f"Epoch {epoch} | Training loss:{np.mean(loss_epoch)}")
 
     store_train_results(loss_all,model)
 
