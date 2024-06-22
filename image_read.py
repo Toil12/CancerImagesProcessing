@@ -270,7 +270,7 @@ if __name__ == '__main__':
     optimizer = torch.optim.SGD(model.parameters(), lr=0.02, momentum=0.5)
     loss_all=[]
 
-    for epoch in tqdm(range(10)):
+    for epoch in tqdm(range(100)):
         loss_epoch = []
         for images, labels in iter(train_loader):
             images = images.to(device)
