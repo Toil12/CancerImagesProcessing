@@ -1,9 +1,12 @@
 import os.path
 import platform
+
+import numpy
 import tifffile
 from skimage import io
 from PIL import Image
 import cv2
+import os
 from bs4 import BeautifulSoup
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -21,6 +24,7 @@ from sklearn.model_selection import train_test_split
 BASE_PATH=osp.join(osp.curdir,"data","BreastCancerCellSegmentation")
 IMAGES_PATH = osp.join(BASE_PATH, 'Images')
 LABELS_PATH = osp.join(BASE_PATH, 'Masks')
+TRAIN_PATH=osp.join(osp.curdir,"train")
 # print(os.path.exists(BASE_PATH))
 
 # images and masks path, slash should depend on the system
@@ -176,14 +180,7 @@ class UNet(nn.Module):
         logits = self.outc(x)
         return logits
 
-# set device
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = UNet(n_channels=3, n_classes=1)
-model.to(device)
 
-# loss and optimizer
-criterion = nn.BCEWithLogitsLoss()
-optimizer = torch.optim.SGD(model.parameters(), lr=0.02, momentum=0.5)
 
 def dice_loss(inputs, target):
     inputs = torch.sigmoid(inputs)
@@ -194,8 +191,30 @@ def dice_loss(inputs, target):
     loss = 1 - ((2. * intersection + smooth) / (iflat.sum() + tflat.sum() + smooth))
     return loss
 
-if __name__ == '__main__':
+def store_train_results(loss_array:numpy.array,model:nn.Module):
+    file_names=os.listdir(TRAIN_PATH)
+    store_path=""
+    if file_names==[]:
+        store_path=osp.join(TRAIN_PATH,f"train_{0}")
+    else:
+        store_path=osp.join(TRAIN_PATH,f"train_{len(file_names)-1}")
+    os.mkdir(store_path)
 
+    torch.save(model.state_dict(),store_path)
+    np.save(loss_array,store_path)
+
+
+def train_s():
+    # set device
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = UNet(n_channels=3, n_classes=1)
+    model.to(device)
+
+    # loss and optimizer
+    criterion = nn.BCEWithLogitsLoss()
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.02, momentum=0.5)
+
+    loss_all=np.zeros(0)
     for epoch in tqdm(range(100)):
         for images, labels in iter(train_loader):
             images = images.to(device)
@@ -212,10 +231,69 @@ if __name__ == '__main__':
             # output[output >= 0.5] = 1
             # output[output < 0.5] = 0
 
-            loss = criterion(output, labels)
+            loss_train = criterion(output, labels)
+            loss_all=np.append(loss_all,loss_train)
             optimizer.zero_grad()
-            loss.backward()
+            loss_train.backward()
             optimizer.step()
+
+
+
+        print(f"Epoch {epoch}      training loss:{loss_train}")
+
+    # process output by a threshold
+    output = torch.sigmoid(output)
+    output[output >= 0.5] = 1
+    output[output < 0.5] = 0
+
+    batch_index = 0
+    print("image")
+    plt.imshow(images.cpu().detach().numpy()[batch_index, 0])
+    plt.show()
+    print("output")
+    plt.imshow(output.cpu().detach().numpy()[batch_index, 0])
+    plt.show()
+    print("label")
+    plt.imshow(labels.cpu().detach().numpy()[batch_index, 0])
+    plt.show()
+
+if __name__ == '__main__':
+    # set device
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = UNet(n_channels=3, n_classes=1)
+    model.to(device)
+
+    # loss and optimizer
+    criterion = nn.BCEWithLogitsLoss()
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.02, momentum=0.5)
+
+    loss_all=np.zeros(0)
+    for epoch in tqdm(range(100)):
+        for images, labels in iter(train_loader):
+            images = images.to(device)
+            labels = labels.to(device)
+
+            images = images.permute(0, 3, 2, 1).float()
+            labels = labels.permute(0, 3, 2, 1).float()
+            labels = labels.sum(1, keepdim=True).bool().float()
+
+            output = model(images)
+
+            # process output by a threshold
+            # output = torch.sigmoid(output)
+            # output[output >= 0.5] = 1
+            # output[output < 0.5] = 0
+
+            loss_train = criterion(output, labels)
+            loss_all=np.append(loss_all,loss_train)
+            optimizer.zero_grad()
+            loss_train.backward()
+            optimizer.step()
+
+
+
+        print(f"Epoch {epoch} training loss:{loss_train}")
+    store_train_results(loss_train,model)
 
     # process output by a threshold
     output = torch.sigmoid(output)
