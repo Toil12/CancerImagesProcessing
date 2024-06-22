@@ -266,8 +266,8 @@ if __name__ == '__main__':
     # loss and optimizer
     criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=0.02, momentum=0.5)
+    loss_all=[]
 
-    loss_all=np.zeros(0)
     for epoch in tqdm(range(100)):
         for images, labels in iter(train_loader):
             images = images.to(device)
@@ -285,7 +285,7 @@ if __name__ == '__main__':
             # output[output < 0.5] = 0
 
             loss_train = criterion(output, labels)
-            loss_all=np.append(loss_all,loss_train)
+            loss_all=loss_all.append(loss_train)
             optimizer.zero_grad()
             loss_train.backward()
             optimizer.step()
